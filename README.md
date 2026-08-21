@@ -285,6 +285,29 @@ terraform apply
 ```bash
 terraform destroy
 ```
+## Validation & Testing
+
+### Infrastructure Deployment
+![ALB Active](screenshots/alb-active.png)
+- Application Load Balancer actively routing traffic to healthy instances
+
+### Target Group Health
+![Auto Scaling Healthy](screenshots/auto-scaling-healthy.png)
+- ASG maintaining 2 desired instances across AZ 1a and 1c
+- Both instances registered and healthy in ALB target group
+
+### Application Testing
+![Application ALB Test](screenshots/application-alb-test.png)
+- Application accessible via ALB DNS endpoint
+
+### Terraform State Management
+![Remote State Bucket](screenshots/s3-remote-state-bucket.png)
+![State Versioning](screenshots/s3-terraform-state.png)
+- Remote state stored in S3 with versioning and locking enabled
+
+### Architecture Overview
+![VPC Resources](screenshots/vpc-resource-map.png)
+- Complete VPC infrastructure with all resources deployed
 ## Technologies
 
 **AWS · Terraform · Linux · Git · GitHub**
