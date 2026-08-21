@@ -285,6 +285,58 @@ terraform apply
 ```bash
 terraform destroy
 ```
+## Screenshots
+
+### 1. VPC Architecture
+Shows the `2-tier` VPC with:
+- `10.0.0.0/16`
+- 2 public subnets
+- 2 private subnets
+- Internet Gateway
+- NAT Gateway
+- Route tables
+
+![VPC Architecture](screenshots/01-vpc-resource-map.png)
+
+### 2. Application Load Balancer
+ALB deployed as an internet-facing Application Load Balancer across two Availability Zones.
+
+![Application Load Balancer](screenshots/02-alb-active.png)
+
+### 3. Auto Scaling Group
+ASG configured with:
+- Minimum: 2
+- Desired: 2
+- Maximum: 4
+- 2/2 instances healthy
+
+![Auto Scaling Group](screenshots/03-auto-scaling-healthy.png)
+
+### 4. Auto Scaling Self-Healing
+Tested instance replacement. When an EC2 instance became unhealthy, the ASG terminated it and automatically launched a replacement.
+
+![ASG Self Healing](screenshots/04-auto-scaling-self-healing.png)
+
+### 5. S3 Remote Terraform State
+Remote Terraform state stored in the S3 bucket:
+
+` srinil-539`
+
+![S3 Remote State](screenshots/05-s3-remote-state-bucket.png)
+
+### 6. Terraform State Object
+Terraform state stored as:
+
+`terraform.state`
+
+S3 bucket versioning was enabled.
+
+![Terraform State](screenshots/06-s3-terraform-state.png)
+
+### 7. Application Test
+Successfully accessed the application through the ALB DNS endpoint.
+
+![Application Test](screenshots/07-application-alb-test.png)
 ## Technologies
 
 **AWS · Terraform · Linux · Git · GitHub**
