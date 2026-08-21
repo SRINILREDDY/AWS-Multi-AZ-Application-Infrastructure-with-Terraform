@@ -285,29 +285,6 @@ terraform apply
 ```bash
 terraform destroy
 ```
-## Screenshots
-
-### VPC Architecture
-![VPC Resource Map](screenshots/01-vpc-resource-map.png)
-
-### Application Load Balancer
-![ALB Active](screenshots/02-alb-active.png)
-
-### Auto Scaling Group
-![Auto Scaling Healthy](screenshots/03-auto-scaling-healthy.png)
-
-### Auto Scaling Self-Healing
-![ASG Self-Healing](screenshots/04-auto-scaling-self-healing.png)
-
-### Remote Terraform State
-![S3 Remote State](screenshots/05-s3-remote-state-bucket.png)
-
-### Terraform State Object
-![Terraform State](screenshots/06-s3-terraform-state.png)
-
-### Application Test
-![ALB Application Test](screenshots/07-application-alb-test.png)
-
 ## Technologies
 
 **AWS · Terraform · Linux · Git · GitHub**
