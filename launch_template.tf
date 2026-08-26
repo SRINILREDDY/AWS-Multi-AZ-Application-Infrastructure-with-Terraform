@@ -1,8 +1,11 @@
 resource "aws_launch_template" "template" {
-  image_id               = "ami-0ac7b260cf76d8865"
+  image_id               = "ami-06a8e57e305a2d159"
   instance_type          = var.instance_type
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
+iam_instance_profile {
+  name = aws_iam_instance_profile.ec2_cloudwatch_profile.name
+}
   user_data = base64encode(<<-EOF
     #!/bin/bash
 
