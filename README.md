@@ -1,6 +1,6 @@
 # AWS 2-Tier Architecture with Terraform
 
-Production-style AWS 2-tier web application infrastructure provisioned using Terraform.
+Production-style AWS 2-tier web application infrastructure provisioned using Terraform, with host-level intrusion detection and a reusable security baseline through a Golden AMI.
 
 ## Architecture
 
@@ -29,13 +29,31 @@ Production-style AWS 2-tier web application infrastructure provisioned using Ter
                        NAT Gateway
                             |
                      Internet Gateway
-````
+
+Security Layer:
+
+        EC2 Host
+           |
+        CrowdSec
+           |
+    SSH brute-force detection
+           |
+      Ban decision
+           |
+   Firewall Bouncer
+           |
+        nftables
+           |
+     Malicious IP blocked
+```
 
 ## Project Overview
 
 This project demonstrates the design and deployment of a highly available 2-tier AWS architecture using Infrastructure as Code with Terraform.
 
 The architecture separates the public load-balancing layer from the private application layer and uses Auto Scaling for application-instance self-healing.
+
+Security is integrated into the infrastructure through CrowdSec host-level intrusion detection, automated firewall enforcement, and a Golden AMI containing the preconfigured security baseline.
 
 ## Key Features
 
@@ -50,6 +68,11 @@ The architecture separates the public load-balancing layer from the private appl
 * Auto Scaling Group with automatic instance replacement
 * Security-group-based network isolation
 * Apache HTTP server automated through EC2 user data
+* CrowdSec host-level intrusion detection
+* SSH brute-force detection using the `crowdsecurity/ssh-bf` scenario
+* CrowdSec Firewall Bouncer with nftables enforcement
+* Golden AMI with CrowdSec security baseline preconfigured
+* EC2 IAM role and instance profile for CloudWatch Agent integration
 * Terraform variables and outputs
 * Remote state management via a versioned S3 backend
 * Git/GitHub version control
@@ -134,6 +157,88 @@ Database Security Group
 
 > Note: The database security group is configured as part of the network/security design; an RDS database is not provisioned in this version of the project.
 
+### CrowdSec Host Security
+
+CrowdSec is used as the host-level intrusion detection and automated response layer for the EC2 instances.
+
+```text
+SSH authentication failures
+          |
+          v
+      CrowdSec
+          |
+   ssh-bf scenario
+          |
+     Ban decision
+          |
+          v
+ Firewall Bouncer
+          |
+          v
+       nftables
+          |
+          v
+   Malicious IP blocked
+```
+
+The implementation includes:
+
+* CrowdSec Security Engine running on EC2
+* SSH collection and `crowdsecurity/ssh-bf` scenario
+* CrowdSec Firewall Bouncer
+* nftables firewall enforcement
+* Automated IP ban decisions
+
+### CrowdSec Validation
+
+The security workflow was tested with controlled SSH authentication failures.
+
+The test produced a CrowdSec decision with:
+
+```text
+Reason:  crowdsecurity/ssh-bf
+Action:  ban
+Events:  6
+```
+
+The banned source IP was then verified in the CrowdSec nftables blacklist, confirming that the firewall bouncer enforced the CrowdSec decision at the host level.
+
+The decision was also manually removed and the nftables blacklist was verified to be cleared, validating the full decision lifecycle.
+
+## Golden AMI Security Baseline
+
+A hardened EC2 instance was configured with CrowdSec and the firewall bouncer and then captured as a Golden AMI.
+
+```text
+Hardened EC2
+     |
+     | CrowdSec + Firewall Bouncer
+     v
+  Golden AMI
+     |
+     v
+Launch Template
+     |
+     v
+Auto Scaling Group
+     |
+   ┌─┴─┐
+   v   v
+ EC2  EC2
+  |    |
+CrowdSec already configured
+```
+
+A new EC2 instance was launched from the Golden AMI and verified with `systemctl` to confirm that CrowdSec was already installed and running without manually reinstalling it.
+
+This provides a consistent security baseline for new and replacement instances launched through the Launch Template.
+
+## IAM & CloudWatch
+
+The project includes an EC2 IAM role and instance profile for CloudWatch Agent integration.
+
+The IAM configuration uses the AWS managed `CloudWatchAgentServerPolicy` rather than embedding credentials on the EC2 instances.
+
 ## Auto Scaling & Self-Healing
 
 The Auto Scaling Group is configured with:
@@ -154,6 +259,8 @@ Maximum: 4
 6. ALB health checks validated the instance.
 
 **Result:** Auto Scaling successfully restored the desired capacity.
+
+Because the Launch Template uses the Golden AMI, replacement instances can inherit the preconfigured CrowdSec security baseline.
 
 ## Load Balancer Testing
 
@@ -223,6 +330,7 @@ The infrastructure was originally applied with local state. The backend was then
 ├── alb.tf
 ├── asg.tf
 ├── backend.tf
+├── iam.tf
 ├── launch_template.tf
 ├── output.tf
 ├── security.tf
@@ -285,6 +393,7 @@ terraform apply
 ```bash
 terraform destroy
 ```
+
 ## Validation & Testing
 
 ### Infrastructure Deployment
@@ -308,9 +417,10 @@ terraform destroy
 ### Architecture Overview
 ![VPC Resources](screenshots/vpc-resource-map.png)
 - Complete VPC infrastructure with all resources deployed
+
 ## Technologies
 
-**AWS · Terraform · Linux · Git · GitHub**
+**AWS · Terraform · Linux · Git · GitHub · CrowdSec · nftables · Golden AMI · CloudWatch**
 
 ## Author
 
