@@ -8,7 +8,7 @@ variable "instance_type" {
   default = "t3.micro"
 }
 
-variable "project_name " {
+variable "project_name" {
   description = "2-tier"
-  type = string
+  type        = string
 }
