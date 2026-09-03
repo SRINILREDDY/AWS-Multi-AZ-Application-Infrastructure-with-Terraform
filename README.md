@@ -49,7 +49,7 @@ Security Layer:
 
 ## Project Overview
 
-This project demonstrates the design and deployment of a highly available 2-tier AWS architecture using Infrastructure as Code with Terraform.
+This project demonstrates the design and deployment of a highly available AWS Multi-AZ Application Infrastructure  using Infrastructure as Code with Terraform.
 
 The architecture separates the public load-balancing layer from the private application layer and uses Auto Scaling for application-instance self-healing.
 
