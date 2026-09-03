@@ -11,5 +11,5 @@ variable "instance_type" {
 variable "project_name" {
   description = "2_tier architecture with github actions"
   type        = string
-  default = "2_tier"
+  default     = "2_tier"
 }
