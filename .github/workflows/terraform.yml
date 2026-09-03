@@ -51,6 +51,7 @@ on:
     branches: ["main"]
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
@@ -63,6 +64,15 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
 
       - name: Terraform Init
         run: terraform init
