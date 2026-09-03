@@ -418,6 +418,79 @@ terraform destroy
 ![VPC Resources](screenshots/vpc-resource-map.png)
 - Complete VPC infrastructure with all resources deployed
 
+
+## CI/CD with GitHub Actions
+
+GitHub Actions is used to automatically validate Terraform changes and generate an AWS infrastructure plan on every push to `main` and every pull request targeting `main`.
+
+### Workflow
+
+```text
+Git Push / Pull Request
+          |
+          v
+     GitHub Actions
+          |
+          +--> Checkout repository
+          |
+          +--> Setup Terraform
+          |
+          +--> Configure AWS credentials
+          |
+          +--> Verify AWS identity
+          |
+          +--> terraform init
+          |
+          +--> terraform fmt -check -recursive
+          |
+          +--> terraform validate
+          |
+          +--> terraform plan
+```
+
+### AWS Authentication
+
+This project currently authenticates GitHub Actions to AWS using encrypted GitHub repository secrets:
+
+- `AWS_ACCESS_KEY`
+- `AWS_SECRET_KEY`
+
+The credentials are consumed by the `aws-actions/configure-aws-credentials` action and are not stored in the Terraform source code.
+
+> **Security note:** Long-lived AWS access keys are suitable for demonstrating the workflow, but OpenID Connect (OIDC) with short-lived IAM role credentials is the preferred production approach because it avoids storing long-lived AWS credentials in GitHub.
+
+### Terraform CI Checks
+
+The workflow runs the following checks:
+
+```bash
+terraform init
+terraform fmt -check -recursive
+terraform validate
+terraform plan -input=false
+```
+
+The pipeline does **not** automatically run `terraform apply`. This keeps infrastructure changes reviewable before deployment.
+
+### Successful Pipeline
+
+The completed workflow has been verified successfully in GitHub Actions, including:
+
+- AWS credential configuration
+- AWS identity verification
+- Terraform initialization
+- Terraform formatting check
+- Terraform validation
+- Terraform plan
+
+This demonstrates an end-to-end Infrastructure-as-Code validation pipeline for the AWS environment.
+
+### GitHub Actions Workflow File
+
+```text
+.github/workflows/terraform.yml
+```
+
 ## Technologies
 
 **AWS · Terraform · Linux · Git · GitHub · CrowdSec · nftables · Golden AMI · CloudWatch**
