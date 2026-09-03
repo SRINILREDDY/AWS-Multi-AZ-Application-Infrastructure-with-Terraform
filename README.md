@@ -1,6 +1,6 @@
-# AWS 2-Tier Architecture with Terraform
+AWS Multi-AZ Application Infrastructure
 
-Production-style AWS 2-tier web application infrastructure provisioned using Terraform, with host-level intrusion detection and a reusable security baseline through a Golden AMI.
+AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terraform, with host-level intrusion detection and a reusable security baseline through a Golden AMI.
 
 ## Architecture
 
