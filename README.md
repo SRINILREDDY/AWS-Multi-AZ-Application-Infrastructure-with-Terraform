@@ -4,34 +4,71 @@ AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terrafo
 
 ## Architecture
 
+### Architecture Diagram
+
+```mermaid
+flowchart TB
+    Internet((Internet)) --> IGW[Internet Gateway]
+
+    subgraph VPC[Custom VPC 10.0.0.0/16]
+        subgraph AZ1[Availability Zone 1]
+            Pub1[Public Subnet]
+            Priv1[Private Subnet]
+        end
+        subgraph AZ2[Availability Zone 2]
+            Pub2[Public Subnet]
+            Priv2[Private Subnet]
+        end
+        ALB[Application Load Balancer]
+        TG[Target Group]
+        ASG[Auto Scaling Group]
+        NAT[NAT Gateway]
+    end
+
+    IGW --> Pub1
+    IGW --> Pub2
+    Pub1 --> ALB
+    Pub2 --> ALB
+    ALB --> TG
+    TG --> ASG
+    ASG --> Priv1
+    ASG --> Priv2
+    Priv1 --> NAT
+    Priv2 --> NAT
+    NAT --> IGW
+```
+
+### Traffic Flow
+
 ```text
-                         Internet
-                            |
-                            v
-                Application Load Balancer
-                  ┌─────────┴─────────┐
-                  │                   │
-            Public Subnet         Public Subnet
-              AZ 1b                  AZ 1c
-                  │                   │
-                  └─────────┬─────────┘
-                            |
-                       Target Group
-                            |
-                 ┌──────────┴──────────┐
-                 │                     │
-            EC2 Instance          EC2 Instance
-           Private Subnet         Private Subnet
-              AZ 1b                  AZ 1c
-                 │                     │
-                 └──────────┬──────────┘
-                            |
-                       NAT Gateway
-                            |
-                     Internet Gateway
+Internet
+   |
+   v
+Application Load Balancer
+   |
+   v
+Target Group
+   |
+   v
+Auto Scaling Group
+   |
+   +------------------+
+   |                  |
+   v                  v
+EC2 - Private AZ1   EC2 - Private AZ2
+   |                  |
+   +--------+---------+
+            |
+            v
+       NAT Gateway
+            |
+            v
+    Internet Gateway
+```
 
 Security Layer:
 
+```text
         EC2 Host
            |
         CrowdSec
@@ -49,7 +86,7 @@ Security Layer:
 
 ## Project Overview
 
-This project demonstrates the design and deployment of a highly available AWS Multi-AZ Application Infrastructure  using Infrastructure as Code with Terraform.
+This project demonstrates the design and deployment of a highly available AWS Multi-AZ Application Infrastructure using Infrastructure as Code with Terraform.
 
 The architecture separates the public load-balancing layer from the private application layer and uses Auto Scaling for application-instance self-healing.
 
