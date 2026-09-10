@@ -85,7 +85,7 @@ resource "aws_subnet" "private-2" {
 }
 
 #private route table
-resource "aws_route_table" "private-route" {
+resource "aws_route_table" "private-route-1" {
   vpc_id = aws_vpc.tier-2.id
   route {
     cidr_block     = "0.0.0.0/0"
@@ -95,12 +95,12 @@ resource "aws_route_table" "private-route" {
 
 resource "aws_route_table_association" "association-3" {
   subnet_id      = aws_subnet.private-1.id
-  route_table_id = aws_route_table.private-route.id
+  route_table_id = aws_route_table.private-route-1.id
 }
 
 resource "aws_route_table_association" "association-4" {
   subnet_id      = aws_subnet.private-2.id
-  route_table_id = aws_route_table.private-route.id
+  route_table_id = aws_route_table.private-route-1.id
 }
 
 # nat gateway
@@ -119,4 +119,31 @@ resource "aws_nat_gateway" "nat" {
   tags = {
     Name = "nat"
   }
+}
+
+resource "aws_subnet" "private-3"{
+  vpc_id = aws_vpc.tier-2.id
+  cidr_block = "10.0.5.0/24"
+  availability_zone = "ap-south-1b"
+}
+
+resource "aws_subnet" "private-4"{
+  vpc_id = aws_vpc.tier-2.id
+  cidr_block = "10.0.6.0/24"
+  availability_zone = "ap-south-1c"
+}
+
+
+resource "aws_route_table" "private-route-2" {
+  vpc_id = aws_vpc.tier-2.id
+}
+
+resource "aws_route_table_association" "association-5" {
+  subnet_id      = aws_subnet.private-3.id
+  route_table_id = aws_route_table.private-route-2.id
+}
+
+resource "aws_route_table_association" "association-6" {
+  subnet_id      = aws_subnet.private-4.id
+  route_table_id = aws_route_table.private-route-2.id
 }

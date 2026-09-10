@@ -21,3 +21,11 @@ output "private-1" {
 output "private-2" {
   value = aws_subnet.private-2.id
 }
+
+output "private-3"{
+  value = aws_subnet.private-3.id
+}
+
+output "private-4"{
+  value = aws_subnet.private-4.id
+}
