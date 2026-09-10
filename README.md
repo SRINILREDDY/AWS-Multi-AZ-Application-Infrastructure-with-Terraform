@@ -6,7 +6,6 @@ AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terrafo
 
 ### Architecture Diagram
 
-![Uploading aws-2-tier-architecture.png…]()
 
 
 ### Traffic Flow
