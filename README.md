@@ -1,142 +1,146 @@
-AWS Multi-AZ Application Infrastructure
+# AWS Multi-AZ Application Infrastructure with Terraform
 
-AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terraform, with host-level intrusion detection and a reusable security baseline through a Golden AMI.
+Production-style AWS infrastructure built with **Terraform**, designed around **Multi-AZ networking, private application workloads, load balancing, Auto Scaling, RDS MySQL, host-level security, and remote Terraform state management**.
+
+> **Project status:** The core Multi-AZ application and database infrastructure is implemented in Terraform. The S3 frontend, CloudFront, Route 53, ACM, and WAF layers are planned as the next phase.
 
 ## Architecture
 
-### Architecture Diagram
-
-![AWS 2-Tier Architecture](architecture.svg)
-
-### Traffic Flow
-
 ```text
-Internet
-   |
-   v
-Application Load Balancer
-   |
-   v
-Target Group
-   |
-   v
-Auto Scaling Group
-   |
-   +------------------+
-   |                  |
-   v                  v
-EC2 - Private AZ1   EC2 - Private AZ2
-   |                  |
-   +--------+---------+
-            |
-            v
-       NAT Gateway
-            |
-            v
-    Internet Gateway
-```
+                              Internet
+                                  |
+                                  v
+                     +------------------------+
+                     | Application Load       |
+                     | Balancer (Public)      |
+                     +-----------+------------+
+                                 |
+                       HTTP :80  |
+                                 v
+                    +--------------------------+
+                    | Target Group             |
+                    +------------+-------------+
+                                 |
+                                 v
+                    +--------------------------+
+                    | Auto Scaling Group       |
+                    | Desired: 2 | Max: 4      |
+                    +------------+-------------+
+                                 |
+                 +---------------+---------------+
+                 |                               |
+                 v                               v
+        ap-south-1b                       ap-south-1c
+        Private App Subnet                Private App Subnet
+        10.0.3.0/24                       10.0.4.0/24
+                 |                               |
+                 +---------------+---------------+
+                                 |
+                            NAT Gateway
+                                 |
+                         Internet Gateway
 
-Security Layer:
+                    Database Tier - Private
 
-```text
-        EC2 Host
-           |
-        CrowdSec
-           |
-    SSH brute-force detection
-           |
-      Ban decision
-           |
-   Firewall Bouncer
-           |
-        nftables
-           |
-     Malicious IP blocked
+                 +---------------+---------------+
+                 |                               |
+                 v                               v
+        ap-south-1b                       ap-south-1c
+        Private DB Subnet                 Private DB Subnet
+        10.0.5.0/24                       10.0.6.0/24
+                 |                               |
+                 +---------------+---------------+
+                                 |
+                                 v
+                         RDS MySQL Multi-AZ
+                         db.t3.micro / 20 GB
+
+Planned frontend layer:
+
+User -> Route 53 -> CloudFront -> S3
+
+Planned security/HTTPS layer:
+
+CloudFront / ALB -> ACM -> HTTPS
+CloudFront -> WAF
 ```
 
 ## Project Overview
 
-This project demonstrates the design and deployment of a highly available AWS Multi-AZ Application Infrastructure using Infrastructure as Code with Terraform.
+This project demonstrates how to design AWS infrastructure using **Infrastructure as Code (IaC)** with Terraform.
 
-The architecture separates the public load-balancing layer from the private application layer and uses Auto Scaling for application-instance self-healing.
+The infrastructure separates the public load-balancing layer from private application workloads and places the database in dedicated private subnets. The application tier is distributed across two Availability Zones, while the RDS database is configured for Multi-AZ high availability.
 
-Security is integrated into the infrastructure through CrowdSec host-level intrusion detection, automated firewall enforcement, and a Golden AMI containing the preconfigured security baseline.
+The project also includes host-level security using **CrowdSec**, automated firewall enforcement with **nftables**, and a reusable **Golden AMI** security baseline for EC2 instances.
 
-## Key Features
+## Current Infrastructure
 
-* Custom VPC with `10.0.0.0/16` CIDR
-* 2 public subnets across 2 Availability Zones
-* 2 private subnets across 2 Availability Zones
-* Internet Gateway for public subnet connectivity
-* NAT Gateway for private subnet outbound connectivity
-* Internet-facing Application Load Balancer
-* Target Group with HTTP health checks
-* EC2 Launch Template
-* Auto Scaling Group with automatic instance replacement
-* Security-group-based network isolation
-* Apache HTTP server automated through EC2 user data
-* CrowdSec host-level intrusion detection
-* SSH brute-force detection using the `crowdsecurity/ssh-bf` scenario
-* CrowdSec Firewall Bouncer with nftables enforcement
-* Golden AMI with CrowdSec security baseline preconfigured
-* EC2 IAM role and instance profile for CloudWatch Agent integration
-* Terraform variables and outputs
-* Remote state management via a versioned S3 backend
-* Git/GitHub version control
-
-## Infrastructure Metrics
-
-| Component            | Configuration |
-| -------------------- | ------------- |
-| AWS Region           | `ap-south-1`  |
-| Availability Zones   | 2             |
-| VPC                  | `10.0.0.0/16` |
-| Public Subnets       | 2             |
-| Private Subnets      | 2             |
-| EC2 Instance Type    | `t3.micro`    |
-| ASG Desired Capacity | 2             |
-| ASG Minimum          | 2             |
-| ASG Maximum          | 4             |
-| ALB Listener         | HTTP :80      |
-| Application Port     | 80            |
-| NAT Gateway          | 1             |
-| Internet Gateway     | 1             |
+| Layer | AWS Service | Configuration |
+|---|---|---|
+| Network | VPC | `10.0.0.0/16` |
+| Availability | Availability Zones | `ap-south-1b`, `ap-south-1c` |
+| Public Network | Subnets | 2 |
+| Application Network | Private Subnets | 2 |
+| Database Network | Private Subnets | 2 |
+| Internet Access | Internet Gateway | 1 |
+| Private Outbound Access | NAT Gateway | 1 |
+| Load Balancing | Application Load Balancer | Internet-facing |
+| Compute | EC2 | `t3.micro` |
+| Scaling | Auto Scaling Group | Desired 2 / Min 2 / Max 4 |
+| Database | Amazon RDS MySQL | MySQL 8.0, `db.t3.micro`, 20 GB gp3 |
+| Database HA | RDS Multi-AZ | Enabled |
+| Database Access | Security Group | MySQL `3306` from application SG only |
+| Secrets | RDS-managed password | AWS Secrets Manager integration |
+| Monitoring | CloudWatch Agent | EC2 IAM role/profile |
+| IaC | Terraform | AWS provider |
+| State | Amazon S3 | Remote backend with versioning |
 
 ## Network Design
 
-### Public Layer
+### VPC
 
-The public subnets contain the Application Load Balancer.
+- CIDR: `10.0.0.0/16`
+- Region: `ap-south-1`
+- DNS support enabled
+
+### Public Subnets
+
+| Subnet | CIDR | Availability Zone | Purpose |
+|---|---|---|---|
+| `public-1` | `10.0.1.0/24` | `ap-south-1b` | Public ALB / NAT |
+| `public-2` | `10.0.2.0/24` | `ap-south-1c` | Public ALB |
+
+Public subnets use the Internet Gateway for internet connectivity.
+
+### Private Application Subnets
+
+| Subnet | CIDR | Availability Zone | Purpose |
+|---|---|---|---|
+| `private-1` | `10.0.3.0/24` | `ap-south-1b` | EC2 application workloads |
+| `private-2` | `10.0.4.0/24` | `ap-south-1c` | EC2 application workloads |
+
+The application private route table provides outbound internet access through the NAT Gateway:
 
 ```text
-0.0.0.0/0 → Internet Gateway
+Private EC2 -> NAT Gateway -> Internet Gateway -> Internet
 ```
 
-Public subnets:
+There is no direct inbound internet route to the application instances.
 
-* `10.0.1.0/24` — `ap-south-1b`
-* `10.0.2.0/24` — `ap-south-1c`
+### Private Database Subnets
 
-Public IP assignment is enabled for resources launched in these subnets.
+| Subnet | CIDR | Availability Zone | Purpose |
+|---|---|---|---|
+| `private-3` | `10.0.5.0/24` | `ap-south-1b` | RDS subnet group |
+| `private-4` | `10.0.6.0/24` | `ap-south-1c` | RDS subnet group |
 
-### Private Application Layer
+The database subnets use a separate route table without a default internet route.
 
-EC2 application instances run in private subnets.
-
-```text
-0.0.0.0/0 → NAT Gateway
-```
-
-Private subnets:
-
-* `10.0.3.0/24` — `ap-south-1b`
-* `10.0.4.0/24` — `ap-south-1c`
-
-Public IP assignment is disabled.
+This keeps the database tier isolated from direct internet connectivity.
 
 ## Security Design
 
-Traffic is controlled using separate security groups:
+Traffic is restricted using separate security groups:
 
 ```text
 Internet
@@ -154,27 +158,111 @@ Application Security Group
 Database Security Group
 ```
 
-### Security Controls
+### Security Group Rules
 
-* ALB allows HTTP traffic from the internet.
-* Application instances allow HTTP traffic only from the ALB security group.
-* Database security group allows MySQL traffic only from the application security group.
-* Application instances are deployed in private subnets.
-* No direct internet ingress is allowed to the application instances.
+- **ALB SG:** HTTP `80` from the internet.
+- **Application SG:** HTTP `80` only from the ALB security group.
+- **Database SG:** MySQL `3306` only from the application security group.
+- **EC2 instances:** Deployed in private subnets without public IP assignment.
+- **RDS:** `publicly_accessible = false`.
 
-> Note: The database security group is configured as part of the network/security design; an RDS database is not provisioned in this version of the project.
+This creates a controlled traffic path:
 
-### CrowdSec Host Security
+```text
+Internet -> ALB -> EC2 -> RDS
+```
 
-CrowdSec is used as the host-level intrusion detection and automated response layer for the EC2 instances.
+## Amazon RDS MySQL
+
+The database tier was added as a dedicated private database layer.
+
+Configuration:
+
+```hcl
+resource "aws_db_instance" "database" {
+  identifier         = "project"
+  engine             = "mysql"
+  engine_version     = "8.0"
+  instance_class     = "db.t3.micro"
+  allocated_storage  = 20
+  storage_type       = "gp3"
+  multi_az           = true
+
+  db_subnet_group_name = aws_db_subnet_group.mysql.name
+
+  vpc_security_group_ids = [
+    aws_security_group.db_sg.id
+  ]
+
+  manage_master_user_password = true
+  publicly_accessible         = false
+  skip_final_snapshot         = true
+}
+```
+
+The RDS subnet group uses the two dedicated database subnets in `ap-south-1b` and `ap-south-1c`.
+
+`manage_master_user_password = true` allows Amazon RDS to manage the master password rather than storing a database password in Terraform configuration.
+
+`multi_az = true` enables the RDS Multi-AZ deployment for high availability across Availability Zones.
+
+> **Important:** The Terraform configuration and plan have been validated. The repository should not claim the RDS instance is deployed until `terraform apply` has successfully completed.
+
+## Compute & Auto Scaling
+
+The application tier uses an EC2 Launch Template and Auto Scaling Group.
+
+```text
+Minimum:  2
+Desired:  2
+Maximum:  4
+```
+
+The Auto Scaling Group spans the two private application subnets so workloads can run across both Availability Zones.
+
+### Self-Healing Test
+
+The intended validation flow is:
+
+1. Start with the desired EC2 capacity.
+2. Terminate an EC2 instance managed by the ASG.
+3. ASG detects the capacity reduction.
+4. ASG launches a replacement instance.
+5. The replacement registers with the target group.
+6. ALB health checks verify the replacement instance.
+
+## Application Load Balancer
+
+The ALB is internet-facing and deployed across the public subnets.
+
+Current listener:
+
+```text
+Protocol: HTTP
+Port: 80
+```
+
+Target group:
+
+```text
+Protocol: HTTP
+Port: 80
+Health Check Path: /
+```
+
+The ALB forwards requests to healthy EC2 instances in the private application subnets.
+
+## Host-Level Security with CrowdSec
+
+CrowdSec provides host-level intrusion detection and automated response for EC2 instances.
 
 ```text
 SSH authentication failures
           |
           v
-      CrowdSec
+       CrowdSec
           |
-   ssh-bf scenario
+   SSH brute-force scenario
           |
      Ban decision
           |
@@ -188,33 +276,18 @@ SSH authentication failures
    Malicious IP blocked
 ```
 
-The implementation includes:
+The security baseline includes:
 
-* CrowdSec Security Engine running on EC2
-* SSH collection and `crowdsecurity/ssh-bf` scenario
-* CrowdSec Firewall Bouncer
-* nftables firewall enforcement
-* Automated IP ban decisions
+- CrowdSec Security Engine
+- SSH collection
+- `crowdsecurity/ssh-bf` scenario
+- CrowdSec Firewall Bouncer
+- nftables enforcement
+- Automated IP ban decisions
 
-### CrowdSec Validation
+## Golden AMI
 
-The security workflow was tested with controlled SSH authentication failures.
-
-The test produced a CrowdSec decision with:
-
-```text
-Reason:  crowdsecurity/ssh-bf
-Action:  ban
-Events:  6
-```
-
-The banned source IP was then verified in the CrowdSec nftables blacklist, confirming that the firewall bouncer enforced the CrowdSec decision at the host level.
-
-The decision was also manually removed and the nftables blacklist was verified to be cleared, validating the full decision lifecycle.
-
-## Golden AMI Security Baseline
-
-A hardened EC2 instance was configured with CrowdSec and the firewall bouncer and then captured as a Golden AMI.
+A hardened EC2 instance is used as the source for a reusable Golden AMI containing the security baseline.
 
 ```text
 Hardened EC2
@@ -228,95 +301,25 @@ Launch Template
      |
      v
 Auto Scaling Group
-     |
-   ┌─┴─┐
-   v   v
- EC2  EC2
-  |    |
-CrowdSec already configured
 ```
 
-A new EC2 instance was launched from the Golden AMI and verified with `systemctl` to confirm that CrowdSec was already installed and running without manually reinstalling it.
-
-This provides a consistent security baseline for new and replacement instances launched through the Launch Template.
+This allows replacement instances launched by the Auto Scaling Group to inherit the configured security baseline instead of requiring manual security installation each time.
 
 ## IAM & CloudWatch
 
-The project includes an EC2 IAM role and instance profile for CloudWatch Agent integration.
+The project uses an EC2 IAM role and instance profile for CloudWatch Agent integration.
 
-The IAM configuration uses the AWS managed `CloudWatchAgentServerPolicy` rather than embedding credentials on the EC2 instances.
-
-## Auto Scaling & Self-Healing
-
-The Auto Scaling Group is configured with:
+The AWS managed policy:
 
 ```text
-Desired: 2
-Minimum: 2
-Maximum: 4
+CloudWatchAgentServerPolicy
 ```
 
-### Tested Scenario
+is attached to the EC2 role so the instances can interact with CloudWatch without embedding AWS credentials on the servers.
 
-1. Started with 2 EC2 instances.
-2. Terminated an EC2 instance managed by the ASG.
-3. ASG detected the capacity reduction.
-4. A replacement EC2 instance was automatically launched.
-5. The replacement instance registered with the target group.
-6. ALB health checks validated the instance.
+## Terraform Remote State
 
-**Result:** Auto Scaling successfully restored the desired capacity.
-
-Because the Launch Template uses the Golden AMI, replacement instances can inherit the preconfigured CrowdSec security baseline.
-
-## Load Balancer Testing
-
-The application was accessed through the ALB DNS endpoint.
-
-Target group configuration:
-
-```text
-Protocol: HTTP
-Port: 80
-Health Check Path: /
-```
-
-The ALB distributed traffic to healthy EC2 instances in the private subnets.
-
-## Terraform Validation
-
-The configuration was formatted and validated using:
-
-```bash
-terraform fmt
-terraform validate
-terraform plan
-```
-
-Validation completed successfully.
-
-The final plan showed:
-
-```text
-Plan: 22 to add, 0 to change, 0 to destroy
-```
-
-The plan also generated outputs for:
-
-* ALB DNS name
-* VPC ID
-* Public subnet IDs
-* Private subnet IDs
-
-## Remote State Management
-
-Terraform state is stored remotely in a dedicated, versioned S3 bucket instead of locally, so state is durable, shareable, and protected against accidental loss or overwrite.
-
-* **Backend:** S3
-* **Bucket:** `srinil-539`
-* **Region:** `ap-south-1`
-* **State file key:** `terraform.state`
-* **Bucket versioning:** Enabled
+Terraform state is stored remotely in Amazon S3.
 
 ```hcl
 terraform {
@@ -328,7 +331,64 @@ terraform {
 }
 ```
 
-The infrastructure was originally applied with local state. The backend was then reconfigured and the existing state migrated into S3 using `terraform init -migrate-state`, demonstrating backend reconfiguration on a live project rather than only a from-scratch remote setup.
+Configuration:
+
+- Backend: S3
+- Bucket: `srinil-539`
+- Region: `ap-south-1`
+- State key: `terraform.state`
+- Bucket versioning: enabled
+
+The backend was configured after the initial local-state setup and the existing Terraform state was migrated using `terraform init -migrate-state`.
+
+## Terraform Validation
+
+The configuration has been validated with:
+
+```bash
+terraform fmt
+terraform validate
+terraform plan
+```
+
+The latest plan reports:
+
+```text
+Plan: 32 to add, 0 to change, 0 to destroy.
+```
+
+The plan includes the Multi-AZ RDS database, dedicated database subnets, database route table, security groups, ALB, Auto Scaling infrastructure, IAM resources, and supporting network resources.
+
+## CI/CD with GitHub Actions
+
+GitHub Actions is used to validate Terraform changes and generate an infrastructure plan.
+
+```text
+Git Push / Pull Request
+          |
+          v
+     GitHub Actions
+          |
+          +--> Checkout
+          |
+          +--> Setup Terraform
+          |
+          +--> Configure AWS credentials
+          |
+          +--> Verify AWS identity
+          |
+          +--> terraform init
+          |
+          +--> terraform fmt -check
+          |
+          +--> terraform validate
+          |
+          +--> terraform plan
+```
+
+The pipeline does not automatically run `terraform apply`, keeping infrastructure deployment under explicit control.
+
+> **Security note:** The current workflow uses encrypted GitHub repository secrets for AWS credentials. For production workloads, GitHub Actions OIDC with short-lived IAM role credentials is preferred over long-lived access keys.
 
 ## Project Structure
 
@@ -337,6 +397,7 @@ The infrastructure was originally applied with local state. The backend was then
 ├── alb.tf
 ├── asg.tf
 ├── backend.tf
+├── db.tf
 ├── iam.tf
 ├── launch_template.tf
 ├── output.tf
@@ -344,29 +405,16 @@ The infrastructure was originally applied with local state. The backend was then
 ├── variable.tf
 ├── vpc.tf
 ├── architecture.svg
+├── screenshots/
+├── .github/
+│   └── workflows/
 ├── .gitignore
 └── .terraform.lock.hcl
 ```
 
-## Terraform Variables
-
-The project uses variables for:
-
-* VPC CIDR
-* EC2 instance type
-
-## Terraform Outputs
-
-The project exposes:
-
-* ALB DNS name
-* VPC ID
-* Public subnet IDs
-* Private subnet IDs
-
 ## Deployment
 
-### Initialize
+### Initialize Terraform
 
 ```bash
 terraform init
@@ -384,7 +432,7 @@ terraform fmt
 terraform validate
 ```
 
-### Review
+### Review the Plan
 
 ```bash
 terraform plan
@@ -402,107 +450,60 @@ terraform apply
 terraform destroy
 ```
 
-## Validation & Testing
+## Planned Next Phase
 
-### Infrastructure Deployment
-![ALB Active](screenshots/alb-active.png)
-- Application Load Balancer actively routing traffic to healthy instances
+The infrastructure will be extended into a complete frontend + backend AWS architecture.
 
-### Target Group Health
-![Auto Scaling Healthy](screenshots/auto-scaling-healthy.png)
-- ASG maintaining 2 desired instances across AZ 1a and 1c
-- Both instances registered and healthy in ALB target group
-
-### Application Testing
-![Application ALB Test](screenshots/application-alb-test.png)
-- Application accessible via ALB DNS endpoint
-
-### Terraform State Management
-![Remote State Bucket](screenshots/s3-remote-state-bucket.png)
-![State Versioning](screenshots/s3-terraform-state.png)
-- Remote state stored in S3 with versioning and locking enabled
-
-### Architecture Overview
-![VPC Resources](screenshots/vpc-resource-map.png)
-- Complete VPC infrastructure with all resources deployed
-
-
-## CI/CD with GitHub Actions
-
-GitHub Actions is used to automatically validate Terraform changes and generate an AWS infrastructure plan on every push to `main` and every pull request targeting `main`.
-
-### Workflow
+### Frontend
 
 ```text
-Git Push / Pull Request
-          |
-          v
-     GitHub Actions
-          |
-          +--> Checkout repository
-          |
-          +--> Setup Terraform
-          |
-          +--> Configure AWS credentials
-          |
-          +--> Verify AWS identity
-          |
-          +--> terraform init
-          |
-          +--> terraform fmt -check -recursive
-          |
-          +--> terraform validate
-          |
-          +--> terraform plan
+Route 53
+    |
+    v
+CloudFront
+    |
+    v
+S3
 ```
 
-### AWS Authentication
+Planned components:
 
-This project currently authenticates GitHub Actions to AWS using encrypted GitHub repository secrets:
+- S3 frontend bucket
+- Static website assets
+- CloudFront distribution
+- Origin Access Control (OAC)
+- Route 53 DNS
+- ACM certificate / HTTPS
 
-- `AWS_ACCESS_KEY`
-- `AWS_SECRET_KEY`
-
-The credentials are consumed by the `aws-actions/configure-aws-credentials` action and are not stored in the Terraform source code.
-
-> **Security note:** Long-lived AWS access keys are suitable for demonstrating the workflow, but OpenID Connect (OIDC) with short-lived IAM role credentials is the preferred production approach because it avoids storing long-lived AWS credentials in GitHub.
-
-### Terraform CI Checks
-
-The workflow runs the following checks:
-
-```bash
-terraform init
-terraform fmt -check -recursive
-terraform validate
-terraform plan -input=false
-```
-
-The pipeline does **not** automatically run `terraform apply`. This keeps infrastructure changes reviewable before deployment.
-
-### Successful Pipeline
-
-The completed workflow has been verified successfully in GitHub Actions, including:
-
-- AWS credential configuration
-- AWS identity verification
-- Terraform initialization
-- Terraform formatting check
-- Terraform validation
-- Terraform plan
-
-This demonstrates an end-to-end Infrastructure-as-Code validation pipeline for the AWS environment.
-
-### GitHub Actions Workflow File
+### Backend
 
 ```text
-.github/workflows/terraform.yml
+Route 53
+    |
+    v
+ALB
+    |
+    v
+EC2 Auto Scaling
+    |
+    v
+RDS MySQL Multi-AZ
 ```
+
+### Security & Operations
+
+- AWS WAF
+- HTTPS listeners
+- CloudWatch monitoring
+- Additional logging and alerting
+- Cost optimization review
 
 ## Technologies
 
-**AWS · Terraform · Linux · Git · GitHub · CrowdSec · nftables · Golden AMI · CloudWatch**
+**AWS · Terraform · VPC · EC2 · ALB · Auto Scaling · RDS MySQL · S3 · IAM · CloudWatch · Linux · Git · GitHub Actions · CrowdSec · nftables · Golden AMI**
 
 ## Author
 
 **Srinil Reddy**
+
+GitHub: `https://github.com/SRINILREDDY`
