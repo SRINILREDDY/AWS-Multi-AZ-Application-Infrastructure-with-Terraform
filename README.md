@@ -6,7 +6,7 @@ AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terrafo
 
 ### Architecture Diagram
 
-
+![AWS 2-Tier Architecture](architecture.svg)
 
 ### Traffic Flow
 
@@ -343,6 +343,7 @@ The infrastructure was originally applied with local state. The backend was then
 ├── security.tf
 ├── variable.tf
 ├── vpc.tf
+├── architecture.svg
 ├── .gitignore
 └── .terraform.lock.hcl
 ```
