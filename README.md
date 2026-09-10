@@ -6,37 +6,8 @@ AWS Multi-AZ Application Infrastructure with Terraform provisioned using Terrafo
 
 ### Architecture Diagram
 
-```mermaid
-flowchart TB
-    Internet((Internet)) --> IGW[Internet Gateway]
+![Uploading aws-2-tier-architecture.png…]()
 
-    subgraph VPC[Custom VPC 10.0.0.0/16]
-        subgraph AZ1[Availability Zone 1]
-            Pub1[Public Subnet]
-            Priv1[Private Subnet]
-        end
-        subgraph AZ2[Availability Zone 2]
-            Pub2[Public Subnet]
-            Priv2[Private Subnet]
-        end
-        ALB[Application Load Balancer]
-        TG[Target Group]
-        ASG[Auto Scaling Group]
-        NAT[NAT Gateway]
-    end
-
-    IGW --> Pub1
-    IGW --> Pub2
-    Pub1 --> ALB
-    Pub2 --> ALB
-    ALB --> TG
-    TG --> ASG
-    ASG --> Priv1
-    ASG --> Priv2
-    Priv1 --> NAT
-    Priv2 --> NAT
-    NAT --> IGW
-```
 
 ### Traffic Flow
 
