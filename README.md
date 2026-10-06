@@ -380,7 +380,7 @@ Re-run the plan after configuring the backend and database username. The configu
 
 GitHub Actions separates pull-request validation from AWS planning:
 
-- **Pull requests and pushes to main:** `terraform fmt -check -recursive`, `terraform init -backend=false -input=false -lockfile=readonly`, and `terraform validate`.
+- **Pull requests and pushes to main:** `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, and `terraform validate`.
 - **Pushes to main only:** a separate job configures AWS credentials, initializes the S3 backend, and runs `terraform plan -input=false` after validation succeeds.
 - **Pull requests:** validation requires no AWS credentials and does not access the remote state.
 
