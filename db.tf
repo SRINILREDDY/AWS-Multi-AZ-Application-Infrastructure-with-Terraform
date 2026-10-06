@@ -17,7 +17,7 @@ resource "aws_db_instance" "database" {
   engine         = "mysql"
   engine_version = "8.0"
   instance_class = "db.t3.micro"
-  multi_az = true
+  multi_az       = true
 
   allocated_storage = 20
   storage_type      = "gp3"
@@ -28,6 +28,7 @@ resource "aws_db_instance" "database" {
     aws_security_group.db_sg.id
   ]
 
+  username                    = var.db_username
   manage_master_user_password = true
 
   skip_final_snapshot = true

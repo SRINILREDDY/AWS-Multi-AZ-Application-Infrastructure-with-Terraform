@@ -65,6 +65,16 @@ CloudFront / ALB -> ACM -> HTTPS
 CloudFront -> WAF
 ```
 
+## Deployment Evidence
+
+Existing application and networking screenshots:
+
+![Application accessed through the ALB](screenshots/application-alb-test.png)
+![Auto Scaling instances](screenshots/auto-scaling-healthy.png)
+![VPC resource map](screenshots/vpc-resource-map.png)
+
+These screenshots document the earlier application/network deployment. They do not verify deployment of the newly added RDS database.
+
 ## Project Overview
 
 This project demonstrates how to design AWS infrastructure using **Infrastructure as Code (IaC)** with Terraform.
@@ -194,6 +204,7 @@ resource "aws_db_instance" "database" {
     aws_security_group.db_sg.id
   ]
 
+  username                    = var.db_username
   manage_master_user_password = true
   publicly_accessible         = false
   skip_final_snapshot         = true
@@ -202,6 +213,8 @@ resource "aws_db_instance" "database" {
 
 The RDS subnet group uses the two dedicated database subnets in `ap-south-1b` and `ap-south-1c`.
 
+`db_username` defaults to `admin` and can be overridden with `-var="db_username=your_user"`. When managing an existing database, set its actual master username and review the plan before applying changes.
+
 `manage_master_user_password = true` allows Amazon RDS to manage the master password rather than storing a database password in Terraform configuration.
 
 `multi_az = true` enables the RDS Multi-AZ deployment for high availability across Availability Zones.
@@ -209,6 +222,8 @@ The RDS subnet group uses the two dedicated database subnets in `ap-south-1b` an
 > **Important:** The Terraform configuration and plan have been validated. The repository should not claim the RDS instance is deployed until `terraform apply` has successfully completed.
 
 ## Compute & Auto Scaling
+
+The committed user data serves a static Apache page. RDS is provisioned as a separate database tier; a backend application connecting to MySQL is a future extension.
 
 The application tier uses an EC2 Launch Template and Auto Scaling Group.
 
@@ -339,11 +354,13 @@ Configuration:
 - State key: `terraform.state`
 - Bucket versioning: enabled
 
-The backend was configured after the initial local-state setup and the existing Terraform state was migrated using `terraform init -migrate-state`.
+The committed `backend.tf` uses this existing S3 bucket. Create or select the backend bucket separately; it is not provisioned by this configuration. The bucket must exist, have versioning enabled, and be accessible to the identity running Terraform.
+
+For a fresh checkout, run `terraform init`. If this working directory already has local state, back it up and use `terraform init -migrate-state` to migrate it into the S3 backend. Review Terraform’s migration prompt before continuing.
 
 ## Terraform Validation
 
-The configuration has been validated with:
+Validate the current configuration with:
 
 ```bash
 terraform fmt
@@ -351,40 +368,21 @@ terraform validate
 terraform plan
 ```
 
-The latest plan reports:
+A previously recorded plan reported:
 
 ```text
 Plan: 32 to add, 0 to change, 0 to destroy.
 ```
 
-The plan includes the Multi-AZ RDS database, dedicated database subnets, database route table, security groups, ALB, Auto Scaling infrastructure, IAM resources, and supporting network resources.
+Re-run the plan after configuring the backend and database username. The configuration includes the Multi-AZ RDS database, dedicated database subnets, database route table, security groups, ALB, Auto Scaling infrastructure, IAM resources, and supporting network resources.
 
 ## CI/CD with GitHub Actions
 
-GitHub Actions is used to validate Terraform changes and generate an infrastructure plan.
+GitHub Actions separates pull-request validation from AWS planning:
 
-```text
-Git Push / Pull Request
-          |
-          v
-     GitHub Actions
-          |
-          +--> Checkout
-          |
-          +--> Setup Terraform
-          |
-          +--> Configure AWS credentials
-          |
-          +--> Verify AWS identity
-          |
-          +--> terraform init
-          |
-          +--> terraform fmt -check
-          |
-          +--> terraform validate
-          |
-          +--> terraform plan
-```
+- **Pull requests and pushes to main:** `terraform fmt -check -recursive`, `terraform init -backend=false -input=false`, and `terraform validate`.
+- **Pushes to main only:** a separate job configures AWS credentials, initializes the S3 backend, and runs `terraform plan -input=false` after validation succeeds.
+- **Pull requests:** validation requires no AWS credentials and does not access the remote state.
 
 The pipeline does not automatically run `terraform apply`, keeping infrastructure deployment under explicit control.
 
@@ -415,6 +413,8 @@ The pipeline does not automatically run `terraform apply`, keeping infrastructur
 ## Deployment
 
 ### Initialize Terraform
+
+The existing S3 backend bucket must be accessible. For a directory with existing local state, follow the migration instructions above rather than initializing a fresh state.
 
 ```bash
 terraform init

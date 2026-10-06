@@ -121,18 +121,17 @@ resource "aws_nat_gateway" "nat" {
   }
 }
 
-resource "aws_subnet" "private-3"{
-  vpc_id = aws_vpc.tier-2.id
-  cidr_block = "10.0.5.0/24"
+resource "aws_subnet" "private-3" {
+  vpc_id            = aws_vpc.tier-2.id
+  cidr_block        = "10.0.5.0/24"
   availability_zone = "ap-south-1b"
 }
 
-resource "aws_subnet" "private-4"{
-  vpc_id = aws_vpc.tier-2.id
-  cidr_block = "10.0.6.0/24"
+resource "aws_subnet" "private-4" {
+  vpc_id            = aws_vpc.tier-2.id
+  cidr_block        = "10.0.6.0/24"
   availability_zone = "ap-south-1c"
 }
-
 
 resource "aws_route_table" "private-route-2" {
   vpc_id = aws_vpc.tier-2.id
