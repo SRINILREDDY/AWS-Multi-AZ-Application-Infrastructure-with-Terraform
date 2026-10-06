@@ -23,7 +23,7 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Initialize providers without remote state
-        run: terraform init -backend=false -input=false -lockfile=readonly
+        run: terraform init -backend=false -input=false
 
       - name: Terraform Validate
         run: terraform validate
@@ -50,7 +50,7 @@ jobs:
         run: aws sts get-caller-identity
 
       - name: Terraform Init
-        run: terraform init -input=false -lockfile=readonly
+        run: terraform init -input=false
 
       - name: Terraform Plan
         run: terraform plan -input=false
