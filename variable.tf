@@ -13,3 +13,9 @@ variable "project_name" {
   type        = string
   default     = "2_tier"
 }
+
+variable "db_username" {
+  description = "Master username for RDS MySQL. Use the existing username when managing an existing database."
+  type        = string
+  default     = "admin"
+}

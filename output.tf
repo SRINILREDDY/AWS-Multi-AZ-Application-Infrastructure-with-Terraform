@@ -22,10 +22,10 @@ output "private-2" {
   value = aws_subnet.private-2.id
 }
 
-output "private-3"{
+output "private-3" {
   value = aws_subnet.private-3.id
 }
 
-output "private-4"{
+output "private-4" {
   value = aws_subnet.private-4.id
 }
